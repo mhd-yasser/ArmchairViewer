@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Armchair Viewer</title>
+    <style>
+  /* Make sure the page doesn't scroll and canvas fits the screen */
+  body {
+    margin: 0;
+    overflow: hidden;
+  }
+
+  /* Make the 3D canvas fill the screen */
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* Style for the Fullscreen Button */
+  #fullscreenButton {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 12px 18px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    z-index: 10;
+    transition: background-color 0.3s;
+  }
+
+  /* Hover effect for button */
+  #fullscreenButton:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+  }
+
+  /* Style for the scale slider */
+  #scaleSlider {
+    position: absolute;
+    top: 70px;
+    right: 20px;
+    width: 150px;
+    z-index: 10;
+  }
+
+  /* Loading screen style */
+  #loadingScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 20px 30px;
+    border-radius: 10px;
+    z-index: 20;
+  }
+
+  /* Responsive adjustments for smaller screens (like phones) */
+  @media (max-width: 768px) {
+    #fullscreenButton {
+      top: 10px;
+      right: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+    }
+
+    #scaleSlider {
+      top: 60px;
+      width: 120px;
+    }
+
+    #loadingScreen {
+      font-size: 18px;
+      padding: 15px 20px;
+    }
+  }
+</style>
+
+</head>
+<body>
+
+<!-- Load scripts from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.138.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.138.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<button id="fullscreenButton" style="position: absolute; top: 20px; right: 20px; z-index: 10; padding: 10px; background-color: #fff; border: none; cursor: pointer;">
+    Full-Screen
+</button>
+
+<input type="range" id="zoomSlider" min="0.1" max="10" value="1" step="0.1" style="position: absolute; top: 50px; right: 20px; z-index: 10; padding: 10px;">
+
+
+<script>
+    let scene, camera, renderer, controls;
+
+    // Setup Scene
+    scene = new THREE.Scene();
+
+    // Setup Camera
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0,0,0);  // Adjust position for a good initial view
+
+    // Setup Renderer
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Setup OrbitControls
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = true;
+    controls.enableRotate = true;
+    controls.enablePan = true;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.25;
+    controls.maxPolarAngle = Math.PI / 2;
+
+scene.background = new THREE.Color(0xeeeeee);  // Light grey background
+
+
+// Lighting setup
+const ambientLight = new THREE.AmbientLight(0x404040, 1.5);  // Brighter ambient light
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 2);  // Increased intensity
+directionalLight.position.set(5, 5, 5);  // Directional light positioned from the front and above
+scene.add(directionalLight);
+
+// Add point light for highlights from one side
+const pointLight = new THREE.PointLight(0xffffff, 1.5, 100);
+pointLight.position.set(0, 3, 3);  // Position this light slightly above and to the right
+scene.add(pointLight);
+
+// Add another point light for the back of the model
+const backPointLight = new THREE.PointLight(0xffffff, 1.5, 100);
+backPointLight.position.set(0, 3, -3);  // Position this light behind the model
+scene.add(backPointLight);
+
+     // Load Model
+function handleModelLoadError(error) {
+    console.error('Error loading model:', error);
+    alert('Sorry, there was a problem loading the 3D model. Please refresh the page or contact support.');
+}
+
+    const loader = new THREE.GLTFLoader();
+    loader.load('./model/scene.gltf', function(gltf) {
+        scene.add(gltf.scene);
+        gltf.scene.position.set(0, -.25, 0);  // Place model at the center of the scene
+
+        // Get the bounding box of the model to determine the upper right corner
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+
+        // Set the camera's position to be at the upper right corner
+        // (x = center.x + size.x / 2, y = center.y + size.y / 2, z = center.z + size.z / 2)
+
+        camera.position.set(center.x + size.x , center.y + size.y/2, center.z + size.z*3 );
+
+        // Make the camera look at the center of the model
+        camera.lookAt(center);
+
+        // Update the camera's projection matrix
+        camera.updateProjectionMatrix();
+        
+        // Adjust the camera zoom level and update projection
+        camera.zoom = 2;  // Set to middle value for zoom
+        camera.updateProjectionMatrix();
+        
+        // Now the camera is set up at the upper right corner and focused on the center
+
+    }, undefined,
+    handleModelLoadError
+    );
+
+    // Full-screen button logic
+    document.getElementById('fullscreenButton').addEventListener('click', () => {
+        if (renderer.domElement.requestFullscreen) {
+            renderer.domElement.requestFullscreen();
+        } else if (renderer.domElement.mozRequestFullScreen) {
+            renderer.domElement.mozRequestFullScreen();
+        } else if (renderer.domElement.webkitRequestFullscreen) {
+            renderer.domElement.webkitRequestFullscreen();
+        }
+    });
+
+    // Zoom slider logic
+    const zoomSlider = document.getElementById('zoomSlider');
+    
+    // Set the slider value to the middle and update camera zoom
+    zoomSlider.value = 2; // Set to the middle value (adjust based on slider range)
+    camera.zoom = zoomSlider.value;  // Set camera zoom to middle of the slider
+    camera.updateProjectionMatrix(); // Update the camera's projection matrix to reflect the change
+
+    // Update the camera zoom on slider input change
+    zoomSlider.addEventListener('input', function(event) {
+        camera.zoom = event.target.value;
+        camera.updateProjectionMatrix();
+    });
+
+    // Animation loop
+    function animate() {
+        requestAnimationFrame(animate);
+
+        // Update controls
+        controls.update();
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
+</script>
+
+
+</body>
+</html>
